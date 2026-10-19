@@ -1,0 +1,422 @@
+// Esquema core del marketplace físico + digital.
+// Importes en centavos enteros (BigInt). La dualidad vive en ProductVariant.fulfillmentType
+// con una tabla de extensión 1:1 por tipo (PhysicalSpec / DigitalSpec).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  buyer
+  seller
+  admin
+  moderator
+}
+
+enum FulfillmentType {
+  physical
+  digital
+}
+
+enum DeliveryMix {
+  physical
+  digital
+  both
+}
+
+// ───────────── Usuarios y vendedores ─────────────
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  email        String     @unique
+  passwordHash String?    @map("password_hash")
+  fullName     String?    @map("full_name")
+  roles        UserRole[] @default([buyer])
+  status       String     @default("active") // active | suspended | banned
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  seller       Seller?
+  addresses    Address[]
+  orders       Order[]
+  entitlements Entitlement[]
+  reviews      Review[]
+  disputes     Dispute[]   @relation("DisputeOpenedBy")
+
+  @@map("users")
+}
+
+model Address {
+  id         String  @id @default(uuid()) @db.Uuid
+  userId     String  @map("user_id") @db.Uuid
+  recipient  String
+  phone      String?
+  line1      String
+  line2      String?
+  city       String
+  state      String
+  postalCode String  @map("postal_code")
+  country    String  @db.Char(2)
+  isDefault  Boolean @default(false) @map("is_default")
+
+  user         User     @relation(fields: [userId], references: [id])
+  shipsFromFor Seller[] @relation("SellerShipsFrom")
+
+  @@map("addresses")
+}
+
+model Seller {
+  id                  String   @id @default(uuid()) @db.Uuid
+  userId              String   @unique @map("user_id") @db.Uuid
+  storeName           String   @map("store_name")
+  slug                String   @unique
+  businessType        String?  @map("business_type")
+  taxId               String?  @map("tax_id") // cifrar a nivel de aplicación
+  taxRegime           String?  @map("tax_regime")
+  stripeAccountId     String?  @unique @map("stripe_account_id")
+  payoutsEnabled      Boolean  @default(false) @map("payouts_enabled")
+  commissionBps       Int      @default(1500) @map("commission_bps") // 15 % sobre productos
+  ratingAvg           Decimal  @default(0) @map("rating_avg") @db.Decimal(3, 2)
+  ratingCount         Int      @default(0) @map("rating_count")
+  status              String   @default("pending_kyc") // pending_kyc | active | suspended
+  shipsFromAddressId  String?  @map("ships_from_address_id") @db.Uuid
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  user          User           @relation(fields: [userId], references: [id])
+  shipsFrom     Address?       @relation("SellerShipsFrom", fields: [shipsFromAddressId], references: [id])
+  products      Product[]
+  digitalAssets DigitalAsset[]
+  sellerOrders  SellerOrder[]
+  reviews       Review[]
+
+  @@map("sellers")
+}
+
+// ───────────── Catálogo ─────────────
+
+model Category {
+  id       String     @id @default(uuid()) @db.Uuid
+  parentId String?    @map("parent_id") @db.Uuid
+  name     String
+  slug     String     @unique
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id          String      @id @default(uuid()) @db.Uuid
+  sellerId    String      @map("seller_id") @db.Uuid
+  categoryId  String?     @map("category_id") @db.Uuid
+  title       String
+  slug        String
+  description String?
+  attributes  Json        @default("{}")
+  status      String      @default("draft") // draft | in_review | active | rejected | archived
+  deliveryMix DeliveryMix @default(physical) @map("delivery_mix")
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  seller   Seller           @relation(fields: [sellerId], references: [id])
+  category Category?        @relation(fields: [categoryId], references: [id])
+  media    ProductMedia[]
+  variants ProductVariant[]
+  reviews  Review[]
+
+  @@unique([sellerId, slug])
+  @@index([categoryId, status])
+  @@index([deliveryMix])
+  @@map("products")
+}
+
+model ProductMedia {
+  id        String  @id @default(uuid()) @db.Uuid
+  productId String  @map("product_id") @db.Uuid
+  kind      String // image | video | sample_file
+  publicUrl String  @map("public_url") // siempre en el bucket público / CDN
+  position  Int     @default(0)
+  altText   String? @map("alt_text")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_media")
+}
+
+model ProductVariant {
+  id              String          @id @default(uuid()) @db.Uuid
+  productId       String          @map("product_id") @db.Uuid
+  sku             String
+  fulfillmentType FulfillmentType @map("fulfillment_type")
+  name            String?
+  options         Json            @default("{}")
+  priceCents      BigInt          @map("price_cents")
+  currency        String          @default("MXN") @db.Char(3)
+  isActive        Boolean         @default(true) @map("is_active")
+
+  product    Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  physical   PhysicalSpec?
+  digital    DigitalSpec?
+  orderItems OrderItem[]
+
+  @@unique([productId, sku])
+  @@index([fulfillmentType])
+  @@map("product_variants")
+}
+
+model PhysicalSpec {
+  variantId     String   @id @map("variant_id") @db.Uuid
+  stockOnHand   Int      @default(0) @map("stock_on_hand")
+  stockReserved Int      @default(0) @map("stock_reserved")
+  weightGrams   Int      @map("weight_grams")
+  lengthCm      Decimal? @map("length_cm") @db.Decimal(6, 1)
+  widthCm       Decimal? @map("width_cm") @db.Decimal(6, 1)
+  heightCm      Decimal? @map("height_cm") @db.Decimal(6, 1)
+  hsCode        String?  @map("hs_code")
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@map("physical_specs")
+}
+
+model DigitalSpec {
+  variantId       String  @id @map("variant_id") @db.Uuid
+  assetId         String  @map("asset_id") @db.Uuid
+  deliveryKind    String  @default("download") @map("delivery_kind") // download | license_key | course_access
+  maxDownloads    Int?    @map("max_downloads") // null = ilimitadas
+  accessDays      Int?    @map("access_days") // null = acceso permanente
+  updatesIncluded Boolean @default(true) @map("updates_included")
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  asset   DigitalAsset   @relation(fields: [assetId], references: [id])
+
+  @@map("digital_specs")
+}
+
+model DigitalAsset {
+  id       String @id @default(uuid()) @db.Uuid
+  sellerId String @map("seller_id") @db.Uuid
+  title    String?
+
+  seller       Seller                @relation(fields: [sellerId], references: [id])
+  versions     DigitalAssetVersion[]
+  specs        DigitalSpec[]
+  entitlements Entitlement[]
+
+  @@map("digital_assets")
+}
+
+model DigitalAssetVersion {
+  id           String   @id @default(uuid()) @db.Uuid
+  assetId      String   @map("asset_id") @db.Uuid
+  versionLabel String   @map("version_label")
+  storageKey   String   @map("storage_key") // clave en mkt-vault, nunca una URL pública
+  fileName     String?  @map("file_name")
+  mimeType     String?  @map("mime_type")
+  sizeBytes    BigInt?  @map("size_bytes")
+  sha256       String?  @db.Char(64)
+  scanStatus   String   @default("pending") @map("scan_status") // pending | clean | infected | flagged | approved
+  isCurrent    Boolean  @default(false) @map("is_current")
+  changelog    String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  asset          DigitalAsset    @relation(fields: [assetId], references: [id])
+  downloadEvents DownloadEvent[]
+
+  @@index([sha256])
+  @@map("digital_asset_versions")
+}
+
+// ───────────── Pedidos ─────────────
+
+model Order {
+  id               String    @id @default(uuid()) @db.Uuid
+  number           String    @unique
+  buyerId          String    @map("buyer_id") @db.Uuid
+  status           String    @default("pending_payment")
+  requiresShipping Boolean   @map("requires_shipping")
+  shippingAddress  Json?     @map("shipping_address") // copia inmutable
+  billingEmail     String    @map("billing_email")
+  subtotalCents    BigInt    @map("subtotal_cents")
+  shippingCents    BigInt    @default(0) @map("shipping_cents")
+  taxCents         BigInt    @default(0) @map("tax_cents")
+  totalCents       BigInt    @map("total_cents")
+  currency         String    @db.Char(3)
+  paymentIntentId  String?   @unique @map("payment_intent_id")
+  transferGroup    String?   @unique @map("transfer_group")
+  idempotencyKey   String    @unique @map("idempotency_key")
+  paidAt           DateTime? @map("paid_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  buyer        User          @relation(fields: [buyerId], references: [id])
+  sellerOrders SellerOrder[]
+  transactions Transaction[]
+
+  @@map("orders")
+}
+
+model SellerOrder {
+  id              String @id @default(uuid()) @db.Uuid
+  orderId         String @map("order_id") @db.Uuid
+  sellerId        String @map("seller_id") @db.Uuid
+  status          String @default("awaiting_payment")
+  itemsCents      BigInt @map("items_cents")
+  shippingCents   BigInt @default(0) @map("shipping_cents") // va íntegro al vendedor
+  commissionBps   Int    @map("commission_bps") // copia del % vigente al comprar
+  commissionCents BigInt @map("commission_cents") // 15 % de items_cents (el envío no paga comisión)
+  sellerNetCents  BigInt @map("seller_net_cents") // items − comisión + envío
+
+  order        Order         @relation(fields: [orderId], references: [id])
+  seller       Seller        @relation(fields: [sellerId], references: [id])
+  items        OrderItem[]
+  shipments    Shipment[]
+  transactions Transaction[]
+
+  @@unique([orderId, sellerId])
+  @@map("seller_orders")
+}
+
+model OrderItem {
+  id              String          @id @default(uuid()) @db.Uuid
+  sellerOrderId   String          @map("seller_order_id") @db.Uuid
+  variantId       String          @map("variant_id") @db.Uuid
+  fulfillmentType FulfillmentType @map("fulfillment_type") // copiado: decide el flujo de entrega
+  titleSnapshot   String          @map("title_snapshot")
+  unitPriceCents  BigInt          @map("unit_price_cents")
+  quantity        Int
+  lineTotalCents  BigInt          @map("line_total_cents")
+  status          String          @default("pending")
+
+  sellerOrder SellerOrder    @relation(fields: [sellerOrderId], references: [id])
+  variant     ProductVariant @relation(fields: [variantId], references: [id])
+  entitlement Entitlement?
+  review      Review?
+  disputes    Dispute[]
+
+  @@index([sellerOrderId])
+  @@map("order_items")
+}
+
+model Shipment {
+  id             String    @id @default(uuid()) @db.Uuid
+  sellerOrderId  String    @map("seller_order_id") @db.Uuid
+  carrier        String?
+  serviceLevel   String?   @map("service_level")
+  trackingNumber String?   @map("tracking_number")
+  labelUrl       String?   @map("label_url")
+  status         String    @default("label_pending")
+  shippedAt      DateTime? @map("shipped_at")
+  deliveredAt    DateTime? @map("delivered_at")
+
+  sellerOrder SellerOrder @relation(fields: [sellerOrderId], references: [id])
+
+  @@map("shipments")
+}
+
+model Entitlement {
+  id            String    @id @default(uuid()) @db.Uuid
+  orderItemId   String    @unique @map("order_item_id") @db.Uuid
+  buyerId       String    @map("buyer_id") @db.Uuid
+  assetId       String    @map("asset_id") @db.Uuid
+  licenseKey    String?   @map("license_key")
+  downloadsUsed Int       @default(0) @map("downloads_used")
+  maxDownloads  Int?      @map("max_downloads")
+  expiresAt     DateTime? @map("expires_at")
+  status        String    @default("active") // active | suspended | revoked
+  grantedAt     DateTime  @default(now()) @map("granted_at")
+
+  orderItem      OrderItem       @relation(fields: [orderItemId], references: [id])
+  buyer          User            @relation(fields: [buyerId], references: [id])
+  asset          DigitalAsset    @relation(fields: [assetId], references: [id])
+  downloadEvents DownloadEvent[]
+
+  @@index([buyerId, status])
+  @@map("entitlements")
+}
+
+model DownloadEvent {
+  id            BigInt   @id @default(autoincrement())
+  entitlementId String   @map("entitlement_id") @db.Uuid
+  versionId     String   @map("version_id") @db.Uuid
+  ip            String?
+  userAgent     String?  @map("user_agent")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  entitlement Entitlement         @relation(fields: [entitlementId], references: [id])
+  version     DigitalAssetVersion @relation(fields: [versionId], references: [id])
+
+  @@map("download_events")
+}
+
+// ───────────── Dinero ─────────────
+
+model Transaction {
+  id             String    @id @default(uuid()) @db.Uuid
+  orderId        String?   @map("order_id") @db.Uuid
+  sellerOrderId  String?   @map("seller_order_id") @db.Uuid
+  // charge | platform_fee | seller_transfer | refund | transfer_reversal | payout | dispute | adjustment
+  type           String
+  amountCents    BigInt    @map("amount_cents")
+  currency       String    @db.Char(3)
+  stripeObjectId String?   @map("stripe_object_id")
+  status         String // pending | succeeded | failed
+  availableOn    DateTime? @map("available_on")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  order       Order?       @relation(fields: [orderId], references: [id])
+  sellerOrder SellerOrder? @relation(fields: [sellerOrderId], references: [id])
+
+  @@index([sellerOrderId, type])
+  @@map("transactions")
+}
+
+model WebhookEvent {
+  stripeEventId String    @id @map("stripe_event_id")
+  type          String
+  processedAt   DateTime? @map("processed_at")
+  receivedAt    DateTime  @default(now()) @map("received_at")
+
+  @@map("webhook_events")
+}
+
+// ───────────── Reseñas y disputas ─────────────
+
+model Review {
+  id          String   @id @default(uuid()) @db.Uuid
+  orderItemId String   @unique @map("order_item_id") @db.Uuid // solo compra verificada
+  productId   String   @map("product_id") @db.Uuid
+  sellerId    String   @map("seller_id") @db.Uuid
+  buyerId     String   @map("buyer_id") @db.Uuid
+  rating      Int      @db.SmallInt
+  body        String?
+  status      String   @default("published")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id])
+  product   Product   @relation(fields: [productId], references: [id])
+  seller    Seller    @relation(fields: [sellerId], references: [id])
+  buyer     User      @relation(fields: [buyerId], references: [id])
+
+  @@map("reviews")
+}
+
+model Dispute {
+  id              String          @id @default(uuid()) @db.Uuid
+  orderItemId     String          @map("order_item_id") @db.Uuid
+  openedById      String          @map("opened_by") @db.Uuid
+  kind            String // not_received | not_as_described | defective | file_broken | unauthorized
+  flow            FulfillmentType // devolución física o revocación digital
+  status          String          @default("open")
+  resolutionCents BigInt?         @map("resolution_cents")
+  evidenceKeys    String[]        @map("evidence_keys")
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id])
+  openedBy  User      @relation("DisputeOpenedBy", fields: [openedById], references: [id])
+
+  @@map("disputes")
+}

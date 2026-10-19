@@ -1,0 +1,67 @@
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../common/prisma.service';
+import { StripeService } from '../payments/stripe.service';
+import { config } from '../config';
+
+function slugify(s: string) {
+  return s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+    .slice(0, 60);
+}
+
+@Injectable()
+export class SellersService {
+  constructor(private readonly db: PrismaService, private readonly stripe: StripeService) {}
+
+  /** Convierte a un usuario en vendedor: perfil, rol y cuenta Express de Stripe. */
+  async becomeSeller(userId: string, input: { storeName: string; businessType?: string; taxId?: string; taxRegime?: string }) {
+    const user = await this.db.user.findUniqueOrThrow({ where: { id: userId }, include: { seller: true } });
+    if (user.seller) throw new ConflictException('Ya tienes una tienda');
+
+    const base = slugify(input.storeName) || 'tienda';
+    const taken = await this.db.seller.count({ where: { slug: { startsWith: base } } });
+    const slug = taken ? `${base}-${taken + 1}` : base;
+
+    const account = await this.stripe.createExpressAccount(user.email);
+
+    return this.db.$transaction(async (tx) => {
+      if (!user.roles.includes('seller')) {
+        await tx.user.update({ where: { id: userId }, data: { roles: { push: 'seller' } } });
+      }
+      return tx.seller.create({
+        data: {
+          userId,
+          storeName: input.storeName,
+          slug,
+          businessType: input.businessType,
+          taxId: input.taxId, // TODO Fase 1: cifrado de columna con KMS
+          taxRegime: input.taxRegime,
+          stripeAccountId: account.id,
+          commissionBps: config.commissionBps,
+        },
+      });
+    });
+  }
+
+  async onboardingLink(userId: string) {
+    const seller = await this.db.seller.findUnique({ where: { userId } });
+    if (!seller?.stripeAccountId) throw new NotFoundException('Primero crea tu tienda');
+    const link = await this.stripe.createOnboardingLink(
+      seller.stripeAccountId,
+      `${config.webUrl}/vendedor?onboarding=ok`,
+      `${config.webUrl}/vendedor?onboarding=retry`,
+    );
+    return { url: link.url, expiresAt: new Date(link.expires_at * 1000) };
+  }
+
+  async me(userId: string) {
+    const seller = await this.db.seller.findUnique({ where: { userId } });
+    if (!seller) throw new NotFoundException('No tienes tienda');
+    const { taxId: _hidden, ...safe } = seller;
+    return { ...safe, commissionPercent: seller.commissionBps / 100 };
+  }
+}
