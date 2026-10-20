@@ -1,4 +1,4 @@
-import { ForbiddenException, GoneException, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, GoneException, Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { StorageService } from '../storage/storage.service';
 
@@ -13,7 +13,7 @@ export function downloadBlocker(e: { status: string; expiresAt: Date | null; dow
 
 @Injectable()
 export class LibraryService {
-  constructor(private readonly db: PrismaService, private readonly storage: StorageService) {}
+  constructor(@Inject(PrismaService) private readonly db: PrismaService, @Inject(StorageService) private readonly storage: StorageService) {}
 
   async list(buyerId: string) {
     const rows = await this.db.entitlement.findMany({

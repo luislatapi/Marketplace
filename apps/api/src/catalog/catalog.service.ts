@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { deliveryMix, type ProductInput, type ProductQuery } from '@mkt/shared';
 import type { Prisma } from '@mkt/db';
 import { PrismaService } from '../common/prisma.service';
@@ -55,7 +55,7 @@ export function toPublicProduct(p: PublicProduct) {
 
 @Injectable()
 export class CatalogService {
-  constructor(private readonly db: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly db: PrismaService) {}
 
   async list(q: ProductQuery) {
     const where: Prisma.ProductWhereInput = { status: 'active' };

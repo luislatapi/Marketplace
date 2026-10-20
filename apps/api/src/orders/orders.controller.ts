@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Ip, Headers, HttpCode, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Ip, Headers, HttpCode, Param, ParseUUIDPipe, Patch, Post, UseGuards, Inject } from '@nestjs/common';
 import { z } from 'zod';
 import { AuthGuard, CurrentUser, Roles, type AuthUser } from '../auth/auth.guard';
 import { ZodPipe } from '../common/zod.pipe';
@@ -9,7 +9,7 @@ import { SellerOrdersService } from './seller-orders.service';
 @Controller()
 @UseGuards(AuthGuard)
 export class BuyerController {
-  constructor(private readonly orders: OrdersService, private readonly library: LibraryService) {}
+  constructor(@Inject(OrdersService) private readonly orders: OrdersService, @Inject(LibraryService) private readonly library: LibraryService) {}
 
   @Get('orders')
   list(@CurrentUser() user: AuthUser) {
@@ -49,7 +49,7 @@ const shipSchema = z.object({
 @UseGuards(AuthGuard)
 @Roles('seller')
 export class SellerOrdersController {
-  constructor(private readonly sellerOrders: SellerOrdersService) {}
+  constructor(@Inject(SellerOrdersService) private readonly sellerOrders: SellerOrdersService) {}
 
   @Get('orders')
   list(@CurrentUser() user: AuthUser) {

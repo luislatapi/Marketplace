@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, UseGuards, Inject } from '@nestjs/common';
 import { AuthGuard, Roles } from '../auth/auth.guard';
 import { PrismaService } from '../common/prisma.service';
 
@@ -7,7 +7,7 @@ import { PrismaService } from '../common/prisma.service';
 @UseGuards(AuthGuard)
 @Roles('admin')
 export class AdminController {
-  constructor(private readonly db: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly db: PrismaService) {}
 
   @Get('summary')
   async summary() {

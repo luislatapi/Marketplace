@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards, Inject } from '@nestjs/common';
 import { z } from 'zod';
 import { AuthGuard, CurrentUser, Roles, type AuthUser } from '../auth/auth.guard';
 import { ZodPipe } from '../common/zod.pipe';
@@ -21,7 +21,7 @@ const becomeSellerSchema = z.object({
 @Controller('sellers')
 @UseGuards(AuthGuard)
 export class SellersController {
-  constructor(private readonly sellers: SellersService) {}
+  constructor(@Inject(SellersService) private readonly sellers: SellersService) {}
 
   @Post()
   create(@CurrentUser() user: AuthUser, @Body(new ZodPipe(becomeSellerSchema)) body: BecomeSellerBody) {

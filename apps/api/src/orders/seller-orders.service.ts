@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Inject } from '@nestjs/common';
 import type { AuthUser } from '../auth/auth.guard';
 import { CurrentSeller } from '../common/current-seller';
 import { PrismaService } from '../common/prisma.service';
@@ -7,12 +7,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class SellerOrdersService {
-  constructor(
-    private readonly db: PrismaService,
-    private readonly current: CurrentSeller,
-    private readonly fulfillment: FulfillmentService,
-    private readonly notify: NotificationsService,
-  ) {}
+  constructor(@Inject(PrismaService) private readonly db: PrismaService, @Inject(CurrentSeller) private readonly current: CurrentSeller, @Inject(FulfillmentService) private readonly fulfillment: FulfillmentService, @Inject(NotificationsService) private readonly notify: NotificationsService) {}
 
   async list(user: AuthUser) {
     const sellerId = await this.current.id(user);

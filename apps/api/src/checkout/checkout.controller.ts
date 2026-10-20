@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Headers, HttpCode, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Headers, HttpCode, Post, UseGuards, Inject } from '@nestjs/common';
 import { checkoutInputSchema, type CheckoutInput } from '@mkt/shared';
 import { AuthGuard, CurrentUser, type AuthUser } from '../auth/auth.guard';
 import { ZodPipe } from '../common/zod.pipe';
@@ -8,7 +8,7 @@ const quoteSchema = checkoutInputSchema.pick({ items: true, shipping: true, addr
 
 @Controller('checkout')
 export class CheckoutController {
-  constructor(private readonly checkout: CheckoutService) {}
+  constructor(@Inject(CheckoutService) private readonly checkout: CheckoutService) {}
 
   /** Público: la web lo usa para mostrar totales y opciones de envío antes de pedir datos. */
   @Post('quote')

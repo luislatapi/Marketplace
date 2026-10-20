@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, HttpCode, Post, Req } from '@nestjs/common';
+import { BadRequestException, Body, Controller, HttpCode, Post, Req, Inject } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import type { Request } from 'express';
@@ -13,7 +13,7 @@ import { DIGITAL_ALLOWED_TYPES, MAX_DIGITAL_BYTES } from './storage.service';
  */
 @Controller('uploads')
 export class UploadsController {
-  constructor(private readonly db: PrismaService, private readonly jwt: JwtService) {}
+  constructor(@Inject(PrismaService) private readonly db: PrismaService, @Inject(JwtService) private readonly jwt: JwtService) {}
 
   @Post('vault')
   @HttpCode(200)

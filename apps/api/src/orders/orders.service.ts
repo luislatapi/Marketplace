@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, Inject } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { config } from '../config';
 import { FulfillmentService } from '../fulfillment/fulfillment.service';
@@ -9,7 +9,7 @@ type Tx = Parameters<Parameters<PrismaService['$transaction']>[0]>[0];
 export class OrdersService {
   private readonly log = new Logger(OrdersService.name);
 
-  constructor(private readonly db: PrismaService, private readonly fulfillment: FulfillmentService) {}
+  constructor(@Inject(PrismaService) private readonly db: PrismaService, @Inject(FulfillmentService) private readonly fulfillment: FulfillmentService) {}
 
   /**
    * Confirma el pago (llamado solo desde el webhook o en modo demo). Idempotente:

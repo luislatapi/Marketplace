@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { StripeService } from '../payments/stripe.service';
 import { config } from '../config';
@@ -15,7 +15,7 @@ function slugify(s: string) {
 
 @Injectable()
 export class SellersService {
-  constructor(private readonly db: PrismaService, private readonly stripe: StripeService) {}
+  constructor(@Inject(PrismaService) private readonly db: PrismaService, @Inject(StripeService) private readonly stripe: StripeService) {}
 
   /** Convierte a un usuario en vendedor: perfil, rol y cuenta Express de Stripe. */
   async becomeSeller(userId: string, input: { storeName: string; businessType?: string; taxId?: string; taxRegime?: string }) {

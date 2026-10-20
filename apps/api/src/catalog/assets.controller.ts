@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, NotFoundException, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, NotFoundException, Param, ParseUUIDPipe, Post, UseGuards, Inject } from '@nestjs/common';
 import { z } from 'zod';
 import { AuthGuard, CurrentUser, Roles, type AuthUser } from '../auth/auth.guard';
 import { CurrentSeller } from '../common/current-seller';
@@ -26,7 +26,7 @@ const versionSchema = z.object({
 @UseGuards(AuthGuard)
 @Roles('seller')
 export class AssetsController {
-  constructor(private readonly db: PrismaService, private readonly storage: StorageService, private readonly current: CurrentSeller) {}
+  constructor(@Inject(PrismaService) private readonly db: PrismaService, @Inject(StorageService) private readonly storage: StorageService, @Inject(CurrentSeller) private readonly current: CurrentSeller) {}
 
   @Get()
   async list(@CurrentUser() user: AuthUser) {

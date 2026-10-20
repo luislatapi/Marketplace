@@ -1,4 +1,4 @@
-import { Controller, Get, Headers, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get, Headers, UnauthorizedException, Inject } from '@nestjs/common';
 import { timingSafeEqual } from 'node:crypto';
 import { config } from '../config';
 import { OrdersService } from '../orders/orders.service';
@@ -7,7 +7,7 @@ import { PayoutsService } from './payouts.service';
 /** Tareas programadas. Vercel Cron llama con `Authorization: Bearer $CRON_SECRET`. */
 @Controller('cron')
 export class CronController {
-  constructor(private readonly payouts: PayoutsService, private readonly orders: OrdersService) {}
+  constructor(@Inject(PayoutsService) private readonly payouts: PayoutsService, @Inject(OrdersService) private readonly orders: OrdersService) {}
 
   private check(auth?: string) {
     const expected = config.cronSecret ? `Bearer ${config.cronSecret}` : null;

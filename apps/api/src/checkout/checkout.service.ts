@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, Inject } from '@nestjs/common';
 import type { CheckoutInput } from '@mkt/shared';
 import { randomInt } from 'node:crypto';
 import { PrismaService } from '../common/prisma.service';
@@ -11,11 +11,7 @@ import { buildOrderPlan, PlanError, type PlanVariant } from './order-plan';
 export class CheckoutService {
   private readonly log = new Logger(CheckoutService.name);
 
-  constructor(
-    private readonly db: PrismaService,
-    private readonly stripe: StripeService,
-    private readonly orders: OrdersService,
-  ) {}
+  constructor(@Inject(PrismaService) private readonly db: PrismaService, @Inject(StripeService) private readonly stripe: StripeService, @Inject(OrdersService) private readonly orders: OrdersService) {}
 
   private async loadVariants(ids: string[]): Promise<PlanVariant[]> {
     const rows = await this.db.productVariant.findMany({

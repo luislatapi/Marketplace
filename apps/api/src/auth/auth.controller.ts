@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards, Inject } from '@nestjs/common';
 import { z } from 'zod';
 import { ZodPipe } from '../common/zod.pipe';
 import { AuthGuard, CurrentUser, type AuthUser } from './auth.guard';
@@ -13,7 +13,7 @@ const loginSchema = z.object({ email: z.string().email(), password: z.string().m
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(@Inject(AuthService) private readonly auth: AuthService) {}
 
   @Post('register')
   register(@Body(new ZodPipe(registerSchema)) body: z.infer<typeof registerSchema>) {

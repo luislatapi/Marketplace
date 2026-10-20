@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import type Stripe from 'stripe';
 import { PrismaService } from '../common/prisma.service';
 import { OrdersService } from '../orders/orders.service';
@@ -11,7 +11,7 @@ import { OrdersService } from '../orders/orders.service';
 export class PaymentEventsService {
   private readonly log = new Logger(PaymentEventsService.name);
 
-  constructor(private readonly db: PrismaService, private readonly orders: OrdersService) {}
+  constructor(@Inject(PrismaService) private readonly db: PrismaService, @Inject(OrdersService) private readonly orders: OrdersService) {}
 
   async handle(event: Stripe.Event): Promise<'processed' | 'duplicate' | 'ignored'> {
     const seen = await this.db.webhookEvent.findUnique({ where: { stripeEventId: event.id } });

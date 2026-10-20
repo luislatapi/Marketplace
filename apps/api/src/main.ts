@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { ErrorsFilter } from './common/errors.filter';
 import { config } from './config';
 
 // Los importes viven en BigInt (centavos); en JSON salen como número.
@@ -14,6 +15,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
   const origins = config.webUrl.split(',').map((s) => s.trim());
   app.enableCors({ origin: origins, credentials: true, allowedHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key'] });
+  app.useGlobalFilters(new ErrorsFilter());
   app.enableShutdownHooks();
   await app.listen(config.port);
   console.log(`API escuchando en el puerto ${config.port}`);

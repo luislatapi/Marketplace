@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { PrismaService } from '../common/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -26,7 +26,7 @@ export function orderStatusFromItems(statuses: string[]): 'paid' | 'partially_fu
 export class FulfillmentService {
   private readonly log = new Logger(FulfillmentService.name);
 
-  constructor(private readonly db: PrismaService, private readonly notify: NotificationsService) {}
+  constructor(@Inject(PrismaService) private readonly db: PrismaService, @Inject(NotificationsService) private readonly notify: NotificationsService) {}
 
   async fulfill(orderId: string) {
     const order = await this.db.order.findUniqueOrThrow({

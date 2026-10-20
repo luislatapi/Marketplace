@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards, Inject } from '@nestjs/common';
 import { productInputSchema, productQuerySchema, type ProductInput, type ProductQuery } from '@mkt/shared';
 import { z } from 'zod';
 import { AuthGuard, CurrentUser, Roles, type AuthUser } from '../auth/auth.guard';
@@ -8,7 +8,7 @@ import { CatalogService } from './catalog.service';
 
 @Controller('products')
 export class CatalogController {
-  constructor(private readonly catalog: CatalogService) {}
+  constructor(@Inject(CatalogService) private readonly catalog: CatalogService) {}
 
   @Get()
   list(@Query(new ZodPipe(productQuerySchema)) q: ProductQuery) {
@@ -30,7 +30,7 @@ export class CatalogController {
 @UseGuards(AuthGuard)
 @Roles('seller')
 export class SellerProductsController {
-  constructor(private readonly catalog: CatalogService, private readonly current: CurrentSeller) {}
+  constructor(@Inject(CatalogService) private readonly catalog: CatalogService, @Inject(CurrentSeller) private readonly current: CurrentSeller) {}
 
   @Get()
   async mine(@CurrentUser() user: AuthUser) {
@@ -61,7 +61,7 @@ export class SellerProductsController {
 @UseGuards(AuthGuard)
 @Roles('admin', 'moderator')
 export class AdminProductsController {
-  constructor(private readonly catalog: CatalogService) {}
+  constructor(@Inject(CatalogService) private readonly catalog: CatalogService) {}
 
   @Get('review')
   queue() {

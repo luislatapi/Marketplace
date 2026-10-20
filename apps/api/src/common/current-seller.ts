@@ -1,11 +1,11 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, Inject } from '@nestjs/common';
 import type { AuthUser } from '../auth/auth.guard';
 import { PrismaService } from './prisma.service';
 
 /** Resuelve la tienda del usuario autenticado y bloquea tiendas suspendidas. */
 @Injectable()
 export class CurrentSeller {
-  constructor(private readonly db: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly db: PrismaService) {}
 
   async get(user: AuthUser) {
     const seller = await this.db.seller.findUnique({ where: { userId: user.sub } });

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { config } from '../config';
 import { StripeService } from '../payments/stripe.service';
@@ -37,7 +37,7 @@ export function payoutReady(c: PayoutCandidate, hold: { digital: number; physica
 export class PayoutsService {
   private readonly log = new Logger(PayoutsService.name);
 
-  constructor(private readonly db: PrismaService, private readonly stripe: StripeService) {}
+  constructor(@Inject(PrismaService) private readonly db: PrismaService, @Inject(StripeService) private readonly stripe: StripeService) {}
 
   /** Transfiere a cada vendedor su neto (productos − 15 % + envío). Pensado para un cron diario. */
   async releaseDue(now = new Date()) {

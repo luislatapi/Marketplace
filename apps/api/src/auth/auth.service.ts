@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Injectable, UnauthorizedException, Inject } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcryptjs';
 import { PrismaService } from '../common/prisma.service';
@@ -6,7 +6,7 @@ import type { AuthUser } from './auth.guard';
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly db: PrismaService, private readonly jwt: JwtService) {}
+  constructor(@Inject(PrismaService) private readonly db: PrismaService, @Inject(JwtService) private readonly jwt: JwtService) {}
 
   async register(email: string, password: string, fullName?: string) {
     const exists = await this.db.user.findUnique({ where: { email: email.toLowerCase() } });

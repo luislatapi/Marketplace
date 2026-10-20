@@ -6,6 +6,7 @@ import {
   Injectable,
   SetMetadata,
   UnauthorizedException,
+  Inject,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
@@ -30,7 +31,7 @@ export const CurrentUser = createParamDecorator((_: unknown, ctx: ExecutionConte
 /** Verifica el JWT (Bearer) y, si la ruta lo pide, los roles. */
 @Injectable()
 export class AuthGuard implements CanActivate {
-  constructor(private readonly jwt: JwtService, private readonly reflector: Reflector) {}
+  constructor(@Inject(JwtService) private readonly jwt: JwtService, @Inject(Reflector) private readonly reflector: Reflector) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
     const req = ctx.switchToHttp().getRequest<Request & { user?: AuthUser }>();
