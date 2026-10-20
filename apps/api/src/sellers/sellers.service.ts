@@ -26,7 +26,8 @@ export class SellersService {
     const taken = await this.db.seller.count({ where: { slug: { startsWith: base } } });
     const slug = taken ? `${base}-${taken + 1}` : base;
 
-    const account = await this.stripe.createExpressAccount(user.email);
+    // Sin Stripe (modo demo) la tienda se crea igual; la cuenta Express se abre al pedir el alta.
+    const account = config.stripe.enabled ? await this.stripe.createExpressAccount(user.email) : null;
 
     return this.db.$transaction(async (tx) => {
       if (!user.roles.includes('seller')) {
@@ -38,9 +39,10 @@ export class SellersService {
           storeName: input.storeName,
           slug,
           businessType: input.businessType,
-          taxId: input.taxId, // TODO Fase 1: cifrado de columna con KMS
+          taxId: input.taxId, // Fase 2: cifrado de columna
           taxRegime: input.taxRegime,
-          stripeAccountId: account.id,
+          stripeAccountId: account?.id,
+          status: account ? 'pending_kyc' : 'active',
           commissionBps: config.commissionBps,
         },
       });
@@ -48,10 +50,14 @@ export class SellersService {
   }
 
   async onboardingLink(userId: string) {
-    const seller = await this.db.seller.findUnique({ where: { userId } });
-    if (!seller?.stripeAccountId) throw new NotFoundException('Primero crea tu tienda');
+    let seller = await this.db.seller.findUnique({ where: { userId }, include: { user: { select: { email: true } } } });
+    if (!seller) throw new NotFoundException('Primero crea tu tienda');
+    if (!seller.stripeAccountId) {
+      const account = await this.stripe.createExpressAccount(seller.user.email);
+      seller = await this.db.seller.update({ where: { id: seller.id }, data: { stripeAccountId: account.id }, include: { user: { select: { email: true } } } });
+    }
     const link = await this.stripe.createOnboardingLink(
-      seller.stripeAccountId,
+      seller.stripeAccountId!,
       `${config.webUrl}/vendedor?onboarding=ok`,
       `${config.webUrl}/vendedor?onboarding=retry`,
     );

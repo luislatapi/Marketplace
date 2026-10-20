@@ -2,43 +2,44 @@ import { z } from 'zod';
 
 const env = z
   .object({
+    PORT: z.coerce.number().optional(),
     API_PORT: z.coerce.number().default(4000),
     WEB_URL: z.string().default('http://localhost:3000'),
     JWT_SECRET: z.string().min(16).default('dev-only-secret-cambialo'),
     PLATFORM_COMMISSION_BPS: z.coerce.number().int().default(1500),
-    STRIPE_SECRET_KEY: z.string().default('sk_test_placeholder'),
-    STRIPE_WEBHOOK_SECRET: z.string().default('whsec_placeholder'),
-    S3_ENDPOINT: z.string().optional(),
-    S3_REGION: z.string().default('us-east-1'),
-    S3_ACCESS_KEY: z.string().optional(),
-    S3_SECRET_KEY: z.string().optional(),
-    S3_BUCKET_PUBLIC: z.string().default('mkt-public-media'),
-    S3_BUCKET_QUARANTINE: z.string().default('mkt-quarantine'),
-    S3_BUCKET_VAULT: z.string().default('mkt-vault'),
-    S3_BUCKET_PRIVATE_DOCS: z.string().default('mkt-private-docs'),
-    PUBLIC_MEDIA_BASE_URL: z.string().default('http://localhost:9000/mkt-public-media'),
+    STRIPE_SECRET_KEY: z.string().optional(),
+    STRIPE_WEBHOOK_SECRET: z.string().optional(),
+    /** Sin Stripe configurado, los pedidos se marcan pagados al instante (solo pruebas). */
+    DEMO_PAYMENTS: z.enum(['true', 'false']).optional(),
+    BLOB_READ_WRITE_TOKEN: z.string().optional(),
     VAULT_URL_TTL_SECONDS: z.coerce.number().int().min(60).max(900).default(600),
+    CRON_SECRET: z.string().optional(),
+    /** Días que se retiene el 85 % antes de transferir (ventana de devoluciones). */
+    PAYOUT_HOLD_DAYS_DIGITAL: z.coerce.number().int().min(0).default(7),
+    PAYOUT_HOLD_DAYS_PHYSICAL: z.coerce.number().int().min(0).default(7),
+    RESERVATION_MINUTES: z.coerce.number().int().min(5).default(30),
   })
   .parse(process.env);
 
+const stripeEnabled = Boolean(env.STRIPE_SECRET_KEY?.startsWith('sk_'));
+
 export const config = {
-  apiPort: env.API_PORT,
+  port: env.PORT ?? env.API_PORT,
   webUrl: env.WEB_URL,
   jwtSecret: env.JWT_SECRET,
   commissionBps: env.PLATFORM_COMMISSION_BPS,
-  stripe: { secretKey: env.STRIPE_SECRET_KEY, webhookSecret: env.STRIPE_WEBHOOK_SECRET },
-  s3: {
-    endpoint: env.S3_ENDPOINT,
-    region: env.S3_REGION,
-    accessKeyId: env.S3_ACCESS_KEY,
-    secretAccessKey: env.S3_SECRET_KEY,
-    buckets: {
-      public: env.S3_BUCKET_PUBLIC,
-      quarantine: env.S3_BUCKET_QUARANTINE,
-      vault: env.S3_BUCKET_VAULT,
-      privateDocs: env.S3_BUCKET_PRIVATE_DOCS,
-    },
-    publicBaseUrl: env.PUBLIC_MEDIA_BASE_URL,
+  stripe: {
+    enabled: stripeEnabled,
+    secretKey: env.STRIPE_SECRET_KEY ?? 'sk_test_placeholder',
+    webhookSecret: env.STRIPE_WEBHOOK_SECRET ?? 'whsec_placeholder',
+  },
+  /** Pagos simulados: explícitos, o automáticos cuando no hay llave de Stripe. */
+  demoPayments: env.DEMO_PAYMENTS ? env.DEMO_PAYMENTS === 'true' : !stripeEnabled,
+  blob: {
+    enabled: Boolean(env.BLOB_READ_WRITE_TOKEN),
     vaultTtlSeconds: env.VAULT_URL_TTL_SECONDS,
   },
+  cronSecret: env.CRON_SECRET,
+  payoutHoldDays: { digital: env.PAYOUT_HOLD_DAYS_DIGITAL, physical: env.PAYOUT_HOLD_DAYS_PHYSICAL },
+  reservationMinutes: env.RESERVATION_MINUTES,
 };

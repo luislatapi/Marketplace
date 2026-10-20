@@ -30,4 +30,11 @@ export class AuthController {
   me(@CurrentUser() user: AuthUser) {
     return user;
   }
+
+  /** Re-emite el token con los roles actuales (p. ej. después de crear la tienda). */
+  @Post('refresh')
+  @UseGuards(AuthGuard)
+  refresh(@CurrentUser() user: AuthUser) {
+    return this.auth.refresh(user.sub);
+  }
 }

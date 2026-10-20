@@ -214,7 +214,7 @@ model DigitalAssetVersion {
   id           String   @id @default(uuid()) @db.Uuid
   assetId      String   @map("asset_id") @db.Uuid
   versionLabel String   @map("version_label")
-  storageKey   String   @map("storage_key") // clave en mkt-vault, nunca una URL pública
+  storageKey   String   @map("storage_key") // pathname en el Blob privado, nunca una URL pública
   fileName     String?  @map("file_name")
   mimeType     String?  @map("mime_type")
   sizeBytes    BigInt?  @map("size_bytes")
@@ -247,6 +247,8 @@ model Order {
   totalCents       BigInt    @map("total_cents")
   currency         String    @db.Char(3)
   paymentIntentId  String?   @unique @map("payment_intent_id")
+  chargeId         String?   @map("charge_id")
+  paymentMode      String    @default("stripe") @map("payment_mode") // stripe | demo
   transferGroup    String?   @unique @map("transfer_group")
   idempotencyKey   String    @unique @map("idempotency_key")
   paidAt           DateTime? @map("paid_at")
@@ -269,6 +271,9 @@ model SellerOrder {
   commissionBps   Int    @map("commission_bps") // copia del % vigente al comprar
   commissionCents BigInt @map("commission_cents") // 15 % de items_cents (el envío no paga comisión)
   sellerNetCents  BigInt @map("seller_net_cents") // items − comisión + envío
+  transferId      String?   @map("transfer_id") // tr_xxx al liberar el 85 %
+  transferredAt   DateTime? @map("transferred_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
 
   order        Order         @relation(fields: [orderId], references: [id])
   seller       Seller        @relation(fields: [sellerId], references: [id])
@@ -277,6 +282,7 @@ model SellerOrder {
   transactions Transaction[]
 
   @@unique([orderId, sellerId])
+  @@index([status, transferredAt])
   @@map("seller_orders")
 }
 
