@@ -60,7 +60,16 @@ export class StripeService {
     );
   }
 
+  /** Verifica la firma contra el secreto de la plataforma o el de cuentas conectadas. */
   constructEvent(rawBody: Buffer, signature: string) {
-    return this.client.webhooks.constructEvent(rawBody, signature, config.stripe.webhookSecret);
+    let lastError: unknown = new Error('No hay secretos de webhook configurados');
+    for (const secret of config.stripe.webhookSecrets) {
+      try {
+        return this.client.webhooks.constructEvent(rawBody, signature, secret);
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    throw lastError;
   }
 }

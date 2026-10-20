@@ -27,7 +27,8 @@ export class HealthController {
     const checks = {
       database,
       payments: config.stripe.enabled ? 'stripe' : 'demo',
-      stripeWebhook: config.stripe.webhookSecret.startsWith('whsec_') && config.stripe.webhookSecret !== 'whsec_placeholder' ? 'ok' : 'missing',
+      stripeWebhook: process.env.STRIPE_WEBHOOK_SECRET?.startsWith('whsec_') ? 'ok' : 'missing',
+      stripeConnectWebhook: process.env.STRIPE_CONNECT_WEBHOOK_SECRET?.startsWith('whsec_') ? 'ok' : 'missing',
       vault: config.blob.enabled ? 'ok' : 'missing',
       jwtSecret: config.jwtSecret === 'dev-only-secret-cambialo' ? 'default' : 'ok',
       cronSecret: config.cronSecret ? 'ok' : 'missing',

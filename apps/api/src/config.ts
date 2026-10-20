@@ -9,6 +9,8 @@ const env = z
     PLATFORM_COMMISSION_BPS: z.coerce.number().int().default(1500),
     STRIPE_SECRET_KEY: z.string().optional(),
     STRIPE_WEBHOOK_SECRET: z.string().optional(),
+    /** Secreto del webhook de cuentas conectadas (vendedores), p. ej. account.updated. */
+    STRIPE_CONNECT_WEBHOOK_SECRET: z.string().optional(),
     /** Sin Stripe configurado, los pedidos se marcan pagados al instante (solo pruebas). */
     DEMO_PAYMENTS: z.enum(['true', 'false']).optional(),
     BLOB_READ_WRITE_TOKEN: z.string().optional(),
@@ -32,6 +34,8 @@ export const config = {
     enabled: stripeEnabled,
     secretKey: env.STRIPE_SECRET_KEY ?? 'sk_test_placeholder',
     webhookSecret: env.STRIPE_WEBHOOK_SECRET ?? 'whsec_placeholder',
+    /** Todos los secretos válidos: plataforma y cuentas conectadas. */
+    webhookSecrets: [env.STRIPE_WEBHOOK_SECRET, env.STRIPE_CONNECT_WEBHOOK_SECRET].filter((s): s is string => Boolean(s?.startsWith('whsec_'))),
   },
   /** Pagos simulados: explícitos, o automáticos cuando no hay llave de Stripe. */
   demoPayments: env.DEMO_PAYMENTS ? env.DEMO_PAYMENTS === 'true' : !stripeEnabled,
