@@ -33,11 +33,17 @@ export class BuyerController {
   }
 }
 
+interface ShipBody {
+  carrier: string;
+  trackingNumber: string;
+  serviceLevel?: string;
+}
+
 const shipSchema = z.object({
   carrier: z.string().min(2).max(60),
   trackingNumber: z.string().min(4).max(60),
   serviceLevel: z.string().max(60).optional(),
-});
+}) as unknown as z.ZodType<ShipBody>;
 
 @Controller('seller')
 @UseGuards(AuthGuard)
@@ -56,7 +62,7 @@ export class SellerOrdersController {
   }
 
   @Patch('shipments/:id/ship')
-  ship(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(shipSchema)) body: z.infer<typeof shipSchema>) {
+  ship(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(shipSchema)) body: ShipBody) {
     return this.sellerOrders.markShipped(user, id, body);
   }
 
